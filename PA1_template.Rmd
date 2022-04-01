@@ -6,20 +6,145 @@ output:
 ---
 
 
+## Library
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+library(lattice)
+```
+
+
 ## Loading and preprocessing the data
 
+Imported the data file:
+
+```{r}
+unzip("activity.zip")
+activity <- read.csv("activity.csv")
+```
+
+Tidy the data in preparation for analysis
+
+```{r}
+activity$date <- as.Date(activity$date, "%Y-%m-%d")
+```
 
 
 ## What is mean total number of steps taken per day?
 
+Calculating the total number of steps per day:
 
+```{r}
+total.steps <- tapply(activity$steps, as.factor(activity$date), sum, na.rm = TRUE)
+
+#Total number of steps taken per day
+total.steps
+```
+
+Plotting the average total steps per day as a histogram:
+
+```{r}
+hist(total.steps, main = "Total number of steps taken per day", xlab = "Total steps")
+```
+
+Calculating the mean and median of the total number of steps taken per day:
+
+```{r}
+meansteps <- mean(total.steps, na.rm = TRUE)
+mediansteps <- median(total.steps, na.rm = TRUE)
+```
+
+The mean of the total number of steps taken per day is `r meansteps`, and the median is `r mediansteps` 
 
 ## What is the average daily activity pattern?
 
+Making a time series plot of the 5-minute interval and the average steps taken, averaged across all days:
 
+```{r}
+# Calculating the average steps per interval
+steps.interval <- activity %>%
+  group_by(interval) %>%
+  summarise(across(steps, mean, na.rm = TRUE))
 
-## Imputing missing values
+# Plotting results as a time series
+plot(steps.interval$interval, steps.interval$steps, type = "l", main = "Time series plot of steps per interval", xlab = "Interval", ylab = "Steps")
 
+# The 5 minute interval with the maximum number of steps
+steps.interval[which.max(steps.interval$steps),]
+maxsteps <- max(steps.interval$steps)
+```
 
+The 5 minute interval which contains the most number of steps on average is the interval from 08:35-08:40 in the morning. An average of `r maxsteps` is taken in this interval.  
+
+## Imputing missing values 
+
+Calculating the total number of missing values in the dataset:
+
+```{r}
+missing <- sum(is.na(activity))
+```
+
+There are a total of `r missing` values in the dataset.
+
+Filling in the missing values with the mean steps per interval:
+
+```{r}
+activity %>%
+  group_by(interval) %>%
+  mutate(steps = replace_na(steps, mean(steps, na.rm = TRUE)))
+
+#Creating a new dataset with missing data filled in
+
+activity.imputed <- activity %>%
+  group_by(interval) %>%
+  mutate(steps = replace_na(steps, mean(steps, na.rm = TRUE)))
+```
+
+Creating a histogram of the total number of steps, and calculating the mean and median (after imputation):
+
+```{r}
+# Histogram of total steps
+
+total.steps.imputed <- tapply(activity.imputed$steps, as.factor(activity.imputed$date), sum)
+
+hist(total.steps.imputed)
+
+# Mean and median
+
+meansteps.imputed <- mean(total.steps.imputed)
+mediansteps.imputed <- median(total.steps.imputed)
+```
+
+After imputation, the total steps per day becomes more normally distributed. The mean and median values both increase.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Creating a new factor variable indicating which days are weekdays:
+
+```{r}
+activity.imputed <- activity.imputed %>%
+  ungroup() %>%
+  mutate(day.type = weekdays(activity.imputed$date)) %>%
+  mutate(day.type = recode(day.type, "Monday" = "weekday",
+                           "Tuesday" = "weekday",
+                           "Wednesday" = "weekday",
+                           "Thursday" = "weekday",
+                           "Friday" = "weekday",
+                           "Saturday" = "weekend",
+                           "Sunday" = "weekend"))
+
+```
+
+Plotting the activity pattern:
+
+```{r}
+# Calculating the average steps per interval
+steps.interval.imputed <- activity.imputed %>%
+  group_by(interval, day.type) %>%
+  summarise(across(steps, mean, na.rm = TRUE))
+
+# Making the plot
+xyplot(steps ~ interval | day.type, data = steps.interval.imputed, type = "l", layout = c(1, 2))
+```
+
+
